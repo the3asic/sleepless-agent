@@ -91,11 +91,11 @@ class AutoTaskGenerator:
 
     def _should_generate(self) -> bool:
         """Check if usage is below pause threshold (use time-based thresholds)"""
-        from sleepless_agent.monitoring.pro_plan_usage import ProPlanUsageChecker
+        from sleepless_agent.utils.zhipu_env import get_usage_checker
         from sleepless_agent.scheduling.time_utils import is_nighttime
 
         try:
-            checker = ProPlanUsageChecker(command=self.usage_command)
+            checker = get_usage_checker()
             threshold = self.threshold_night if is_nighttime(night_start_hour=self.night_start_hour, night_end_hour=self.night_end_hour) else self.threshold_day
             should_pause, _ = checker.check_should_pause(threshold_percent=threshold)
 

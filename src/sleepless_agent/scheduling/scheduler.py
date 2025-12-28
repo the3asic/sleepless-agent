@@ -226,17 +226,14 @@ class SmartScheduler:
             night_quota_percent=night_quota_percent,
         )
 
-        # Pro plan usage checker (mandatory)
+        # Usage checker (uses ZhipuUsageChecker if USE_ZHIPU=true, else ProPlanUsageChecker)
         try:
-            from sleepless_agent.monitoring.pro_plan_usage import ProPlanUsageChecker
-            self.usage_checker = ProPlanUsageChecker(command=usage_command)
-            logger.debug(
-                "scheduler.usage_checker.ready",
-                command=usage_command,
-            )
+            from sleepless_agent.utils.zhipu_env import get_usage_checker
+            self.usage_checker = get_usage_checker()
+            logger.debug("scheduler.usage_checker.ready")
         except ImportError:
             logger.error("scheduler.usage_checker.unavailable")
-            raise RuntimeError("ProPlanUsageChecker not available - required for scheduling")
+            raise RuntimeError("Usage checker not available - required for scheduling")
 
         # Legacy credit window support
         self.active_windows: List[CreditWindow] = []

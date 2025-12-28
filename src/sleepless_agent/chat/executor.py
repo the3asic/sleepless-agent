@@ -122,12 +122,19 @@ class ChatExecutor:
         # Record user message in history
         session.add_message("user", user_message)
 
+        # Get MCP servers for chat mode (all capabilities)
+        from sleepless_agent.utils.config import get_config
+        from sleepless_agent.utils.mcp_config import get_mcp_servers_for_phase
+        config = get_config()
+        mcp_servers = get_mcp_servers_for_phase(config, phase="chat")
+
         options = ClaudeAgentOptions(
             cwd=str(workspace),
             allowed_tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
             permission_mode="acceptEdits",
             max_turns=self.max_turns,
             model=self.default_model,
+            mcp_servers=mcp_servers if mcp_servers else None,
         )
 
         response_parts = []

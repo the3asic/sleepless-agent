@@ -689,6 +689,12 @@ Output should be:
                 project_id=project_id,
             )
 
+            # Get MCP servers for planner phase (search/reader, no vision)
+            from sleepless_agent.utils.config import get_config
+            from sleepless_agent.utils.mcp_config import get_mcp_servers_for_phase
+            config = get_config()
+            mcp_servers = get_mcp_servers_for_phase(config, phase="planner")
+
             options = ClaudeAgentOptions(
                 cwd=str(workspace),
                 add_dirs=allowed_dirs,
@@ -696,6 +702,7 @@ Output should be:
                 permission_mode="acceptEdits",
                 max_turns=config_max_turns,
                 model=self.default_model,
+                mcp_servers=mcp_servers if mcp_servers else None,
             )
 
             async for message in query(prompt=planner_prompt, options=options):
@@ -815,6 +822,12 @@ Please work through the plan systematically and update TodoWrite as you complete
                 project_id=project_id,
             )
 
+            # Get MCP servers for worker phase (all capabilities)
+            from sleepless_agent.utils.config import get_config
+            from sleepless_agent.utils.mcp_config import get_mcp_servers_for_phase
+            config = get_config()
+            mcp_servers = get_mcp_servers_for_phase(config, phase="worker")
+
             options = ClaudeAgentOptions(
                 cwd=str(workspace),
                 add_dirs=allowed_dirs,
@@ -822,6 +835,7 @@ Please work through the plan systematically and update TodoWrite as you complete
                 permission_mode="acceptEdits",
                 max_turns=config_max_turns,
                 model=self.default_model,
+                mcp_servers=mcp_servers if mcp_servers else None,
             )
 
             async for message in query(prompt=worker_prompt, options=options):
@@ -1062,15 +1076,13 @@ Output should include:
             # Check Pro plan usage after evaluation (mandatory)
             try:
                 from sleepless_agent.utils.config import get_config
-                from sleepless_agent.monitoring.pro_plan_usage import ProPlanUsageChecker
+                from sleepless_agent.utils.zhipu_env import get_usage_checker
                 from sleepless_agent.utils.exceptions import PauseException
                 from sleepless_agent.scheduling.time_utils import is_nighttime
 
                 config = get_config()
                 logger.debug("executor.usage.checking")
-                checker = ProPlanUsageChecker(
-                    command=config.claude_code.usage_command,
-                )
+                checker = get_usage_checker()
 
                 # Use time-based threshold
                 threshold = config.claude_code.threshold_night if is_nighttime(night_start_hour=config.claude_code.night_start_hour, night_end_hour=config.claude_code.night_end_hour) else config.claude_code.threshold_day

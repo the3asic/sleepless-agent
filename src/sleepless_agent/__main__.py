@@ -5,6 +5,15 @@ from __future__ import annotations
 import sys
 from typing import Optional
 
+from dotenv import load_dotenv
+
+# Load .env early
+load_dotenv()
+
+# Setup Zhipu environment if enabled (must be before any Claude CLI calls)
+from sleepless_agent.utils.zhipu_env import setup_zhipu_environment
+setup_zhipu_environment()
+
 from sleepless_agent.interfaces.cli import main as cli_main
 
 

@@ -224,3 +224,6 @@ __marimo__/
 
 workspace/
 tests/
+
+# Local development docs (not tracked)
+CLAUDE.md

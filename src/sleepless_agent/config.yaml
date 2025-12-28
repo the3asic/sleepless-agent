@@ -7,6 +7,28 @@ claude_code:
   threshold_night: 80.0
   usage_command: claude /usage
 
+# Zhipu GLM Coding Plan specific thresholds (higher due to 5-hour reset cycle)
+# Enable via USE_ZHIPU=true in .env
+zhipu:
+  threshold_day: 85.0
+  threshold_night: 95.0
+
+# MCP (Model Context Protocol) server configuration
+# These servers extend GLM-4.7 capabilities (Vision, Web Search, Web Reader)
+# Only active when USE_ZHIPU=true
+mcp:
+  enabled: true
+  zhipu:
+    servers:
+      vision:
+        enabled: true
+        command: npx
+        args: ["-y", "@z_ai/mcp-server"]
+      search:
+        enabled: true
+      reader:
+        enabled: true
+
 git:
   enabled: false  # Set to true to enable git commits and branching
   use_remote_repo: true

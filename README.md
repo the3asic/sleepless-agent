@@ -1,3 +1,55 @@
+> [!NOTE]
+> **This is a personal fork** of [context-machine-lab/sleepless-agent](https://github.com/context-machine-lab/sleepless-agent).
+>
+> I'm adding features that don't exist in the original:
+> - 🔌 **Zhipu GLM Coding Plan** support (替代 Claude，支持国内/国际版自动检测)
+> - 🤖 **MCP 动态注入** (Vision、Search、Reader 能力补充)
+> - 💬 **Telegram** interface (alternative to Slack) - _planned_
+>
+> This is a hobby project. For the official version, please visit the [upstream repository](https://github.com/context-machine-lab/sleepless-agent).
+
+---
+
+## 🔌 智谱 GLM Coding Plan 支持
+
+本 fork 支持使用 [智谱 GLM Coding Plan](https://open.bigmodel.cn/) 替代 Claude Pro，适合国内用户。
+
+### 快速配置
+
+```bash
+# .env
+USE_ZHIPU=true
+ZHIPU_API_KEY=your_zhipu_api_key_here
+
+# 国内版（默认）
+ZHIPU_BASE_URL=https://open.bigmodel.cn/api/anthropic
+
+# 或国际版 (Z.AI)
+# ZHIPU_BASE_URL=https://api.z.ai/api/anthropic
+```
+
+### 功能特性
+
+| 功能 | 说明 |
+|:-----|:-----|
+| **用量监控** | 自动检测 5 小时周期用量，支持阈值暂停 |
+| **区域自动检测** | 从 `ZHIPU_BASE_URL` 自动推断所有端点 |
+| **MCP 动态注入** | 补充 Vision、网络搜索、网页读取能力 |
+| **向后兼容** | `USE_ZHIPU=false` 时使用原版 Claude |
+
+### 与原版差异
+
+| 方面 | Claude Pro | Zhipu GLM |
+|:-----|:-----------|:----------|
+| 用量重置 | 每月/每天 | 每 5 小时 |
+| Vision | 内置 | 通过 MCP |
+| 网络搜索 | 内置 | 通过 MCP |
+| 阈值设置 | 20%/80% | 85%/95% |
+
+详细开发文档见 `CLAUDE.md`。
+
+---
+
 <div align="center">
 
 # Sleepless Agent

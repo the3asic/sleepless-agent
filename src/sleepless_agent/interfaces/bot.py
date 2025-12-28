@@ -801,14 +801,14 @@ class SlackBot:
         Usage: /usage
         """
         try:
-            from sleepless_agent.monitoring.pro_plan_usage import ProPlanUsageChecker
+            from sleepless_agent.utils.zhipu_env import get_usage_checker
             from sleepless_agent.utils.config import get_config
             from sleepless_agent.scheduling.time_utils import is_nighttime
 
             logger.debug("usage_command.start")
 
             config = get_config()
-            checker = ProPlanUsageChecker(command=config.claude_code.usage_command)
+            checker = get_usage_checker()
 
             logger.debug("usage_command.fetching_usage")
             usage_percent, reset_time = checker.get_usage()

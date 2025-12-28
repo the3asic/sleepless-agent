@@ -143,11 +143,9 @@ def command_check(ctx: CLIContext) -> int:
     # Get Pro plan usage info with threshold (only show if usage > 0)
     pro_plan_usage_info = ""
     try:
-        from sleepless_agent.monitoring.pro_plan_usage import ProPlanUsageChecker
+        from sleepless_agent.utils.zhipu_env import get_usage_checker
         from sleepless_agent.scheduling.time_utils import is_nighttime
-        checker = ProPlanUsageChecker(
-            command=config.claude_code.usage_command,
-        )
+        checker = get_usage_checker()
         usage_percent, _ = checker.get_usage()
         if usage_percent > 0:
             threshold = config.claude_code.threshold_night if is_nighttime(night_start_hour=config.claude_code.night_start_hour, night_end_hour=config.claude_code.night_end_hour) else config.claude_code.threshold_day
@@ -838,11 +836,11 @@ def command_usage(ctx: CLIContext) -> int:
     console = Console()
 
     try:
-        from sleepless_agent.monitoring.pro_plan_usage import ProPlanUsageChecker
+        from sleepless_agent.utils.zhipu_env import get_usage_checker
         from sleepless_agent.scheduling.time_utils import is_nighttime
 
         config = get_config()
-        checker = ProPlanUsageChecker(command=config.claude_code.usage_command)
+        checker = get_usage_checker()
 
         usage_percent, reset_time = checker.get_usage()
 

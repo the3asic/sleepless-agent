@@ -125,16 +125,28 @@ class SleeplessAgent:
             base_path=str(self.config.agent.db_path.parent / "reports")
         )
 
-        self.bot = SlackBot(
-            bot_token=self.config.slack.bot_token,
-            app_token=self.config.slack.app_token,
-            task_queue=self.task_queue,
-            scheduler=self.scheduler,
-            monitor=self.monitor,
-            report_generator=self.report_generator,
-            live_status_tracker=self.live_status_tracker,
-            workspace_root=str(self.config.agent.workspace_root),
-        )
+        # Initialize Slack bot if configured, otherwise run in headless mode
+        slack_bot_token = getattr(self.config.slack, 'bot_token', None) if hasattr(self.config, 'slack') else None
+        slack_app_token = getattr(self.config.slack, 'app_token', None) if hasattr(self.config, 'slack') else None
+
+        if slack_bot_token and slack_app_token:
+            self.bot = SlackBot(
+                bot_token=slack_bot_token,
+                app_token=slack_app_token,
+                task_queue=self.task_queue,
+                scheduler=self.scheduler,
+                monitor=self.monitor,
+                report_generator=self.report_generator,
+                live_status_tracker=self.live_status_tracker,
+                workspace_root=str(self.config.agent.workspace_root),
+            )
+        else:
+            self.bot = None
+            logger.warning(
+                "daemon.headless_mode.enabled",
+                reason="no_slack_config",
+                hint="Slack tokens not configured. Running without notifications. Use 'sle check' to monitor status.",
+            )
 
         self.timeout_manager = TaskTimeoutManager(
             config=self.config,
@@ -219,17 +231,26 @@ class SleeplessAgent:
         self.running = True
         logger.info("Sleepless Agent starting...")
 
-        try:
-            # Start bot in background thread to avoid blocking the async event loop
-            # The Slack SDK's connect() is synchronous and would block forever
-            import threading
-            bot_thread = threading.Thread(target=self.bot.start, daemon=True, name="SlackBot")
-            bot_thread.start()
-            await asyncio.sleep(0.5)  # Give bot time to initialize
-            logger.info("Slack bot started in background thread")
-        except Exception as exc:
-            logger.error(f"Failed to start bot: {exc}")
-            return
+        # Start bot in background thread if configured
+        if self.bot:
+            try:
+                import threading
+                bot_thread = threading.Thread(target=self.bot.start, daemon=True, name="SlackBot")
+                bot_thread.start()
+                await asyncio.sleep(0.5)  # Give bot time to initialize
+                logger.info("Slack bot started in background thread")
+            except Exception as exc:
+                logger.warning(
+                    "daemon.bot.start_failed",
+                    error=str(exc),
+                    message="Continuing in headless mode",
+                )
+                self.bot = None
+        else:
+            logger.info(
+                "daemon.headless_mode.running",
+                message="No notification channel configured. Use 'sle check' or logs to monitor.",
+            )
 
         try:
             health_check_counter = 0
@@ -262,7 +283,8 @@ class SleeplessAgent:
             logger.error(f"Unexpected error in main loop: {exc}")
         finally:
             self.monitor.log_health_report()
-            self.bot.stop()
+            if self.bot:
+                self.bot.stop()
             logger.info("Sleepless Agent stopped")
 
     async def _process_tasks(self) -> None:
