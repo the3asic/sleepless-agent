@@ -4,7 +4,7 @@
 > I'm adding features that don't exist in the original:
 > - 🔌 **Zhipu GLM Coding Plan** support (替代 Claude，支持国内/国际版自动检测)
 > - 🤖 **MCP 动态注入** (Vision、Search、Reader 能力补充)
-> - 💬 **Telegram** interface (alternative to Slack) - _planned_
+> - 💬 **Telegram** interface (alternative to Slack) ✅
 >
 > This is a hobby project. For the official version, please visit the [upstream repository](https://github.com/context-machine-lab/sleepless-agent).
 
@@ -47,6 +47,75 @@ ZHIPU_BASE_URL=https://open.bigmodel.cn/api/anthropic
 | 阈值设置 | 20%/80% | 85%/95% |
 
 详细开发文档见 `CLAUDE.md`。
+
+---
+
+## 💬 Telegram Bot 支持
+
+本 fork 支持使用 Telegram 替代 Slack，优先级：Telegram > Slack > Headless。
+
+### 第一步：安装依赖
+
+```bash
+pip install "sleepless-agent[telegram]"
+# 或单独安装
+pip install python-telegram-bot>=21.0
+```
+
+### 第二步：创建 Bot
+
+1. Telegram 搜索 **@BotFather**
+2. 发送 `/newbot`
+3. 设置名称和用户名（必须以 `bot` 结尾）
+4. **保存返回的 token**：`123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`
+
+### 第三步：配置 .env
+
+```bash
+# Telegram Bot Token（必填）
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+
+# 安全白名单（可选，推荐）
+# 只允许特定用户/群组使用 Bot
+TELEGRAM_ALLOWED_CHAT_IDS=12345,67890
+```
+
+### 第四步：获取 Chat ID（用于白名单）
+
+搜索 `@userinfobot` 或 `@RawDataBot`，发送任意消息获取你的 ID。
+
+### 第五步：启动
+
+```bash
+sle daemon
+```
+
+看到日志 `daemon.telegram_bot.initialized` 表示成功。
+
+### 可用命令
+
+| 命令 | 功能 | 示例 |
+|:-----|:-----|:-----|
+| `/start` | 欢迎消息 | `/start` |
+| `/help` | 显示帮助 | `/help` |
+| `/think <描述>` | 添加想法/任务 | `/think 研究 Rust async` |
+| `/think <描述> --project=<名称>` | 添加到项目 | `/think 实现OAuth2 --project=backend` |
+| `/chat <项目>` | 开始聊天模式 | `/chat my-app` |
+| `/chat end` | 结束聊天 | `/chat end` |
+| `/check` | 系统状态 | `/check` |
+| `/usage` | API 用量 | `/usage` |
+| `/cancel <id>` | 取消任务 | `/cancel 5` |
+| `/report` | 今日报告 | `/report` |
+| `/trash list` | 查看回收站 | `/trash list` |
+
+### 优先级说明
+
+Daemon 启动时按以下优先级选择消息接口：
+1. **Telegram**（如果设置了 `TELEGRAM_BOT_TOKEN`）
+2. **Slack**（如果设置了 Slack tokens）
+3. **Headless**（无通知模式）
+
+> 💡 不需要禁用 Slack 配置，只要设置 `TELEGRAM_BOT_TOKEN` 就会自动使用 Telegram。
 
 ---
 

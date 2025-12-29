@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "sleepless-agent"
 version = "0.1.2"
-description = "24/7 AI agent that maximizes Claude usage via Slack interface"
+description = "24/7 AI agent that maximizes Claude usage via Slack or Telegram interface"
 readme = "README.md"
 authors = [{name = "Sleepless Agent Maintainers"}]
 license = {file = "LICENSE"}
-keywords = ["ai", "automation", "agents", "slack", "anthropic"]
+keywords = ["ai", "automation", "agents", "slack", "telegram", "anthropic"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -36,6 +36,9 @@ dependencies = [
     "claude-agent-sdk",
     "requests",
 ]
+
+[project.optional-dependencies]
+telegram = ["python-telegram-bot>=21.0"]
 
 [project.scripts]
 sle = "sleepless_agent.__main__:main"

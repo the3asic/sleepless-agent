@@ -23,6 +23,7 @@ from sleepless_agent.tasks.utils import prepare_task_creation, slugify_project
 from sleepless_agent.utils.live_status import LiveStatusTracker
 from sleepless_agent.monitoring.report_generator import ReportGenerator
 from sleepless_agent.chat import ChatSessionManager, ChatExecutor, ChatHandler
+from sleepless_agent.interfaces.slack_client import SlackMessageClient
 
 
 class SlackBot:
@@ -55,11 +56,15 @@ class SlackBot:
         chat_sessions_path = self.workspace_root / "data" / "chat_sessions.json"
         self.chat_session_manager = ChatSessionManager(storage_path=chat_sessions_path)
         self.chat_executor = ChatExecutor(workspace_root=str(self.workspace_root))
+
+        # Create message client adapter for platform abstraction
+        self.message_client = SlackMessageClient(self.client)
+
         self.chat_handler = ChatHandler(
             session_manager=self.chat_session_manager,
             chat_executor=self.chat_executor,
             task_queue=self.task_queue,
-            slack_client=self.client,
+            message_client=self.message_client,
         )
         self._async_loop: Optional[asyncio.AbstractEventLoop] = None
         self._async_thread: Optional[threading.Thread] = None

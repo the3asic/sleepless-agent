@@ -23,6 +23,7 @@ from sleepless_agent.storage.git import GitManager
 from sleepless_agent.utils.live_status import LiveStatusTracker
 from sleepless_agent.storage.workspace import WorkspaceSetup
 from sleepless_agent.interfaces.bot import SlackBot
+from sleepless_agent.interfaces import TelegramBot, TELEGRAM_AVAILABLE
 from sleepless_agent.monitoring.logging import get_logger
 from sleepless_agent.monitoring.monitor import HealthMonitor, PerformanceLogger
 from sleepless_agent.monitoring.report_generator import ReportGenerator
@@ -125,28 +126,8 @@ class SleeplessAgent:
             base_path=str(self.config.agent.db_path.parent / "reports")
         )
 
-        # Initialize Slack bot if configured, otherwise run in headless mode
-        slack_bot_token = getattr(self.config.slack, 'bot_token', None) if hasattr(self.config, 'slack') else None
-        slack_app_token = getattr(self.config.slack, 'app_token', None) if hasattr(self.config, 'slack') else None
-
-        if slack_bot_token and slack_app_token:
-            self.bot = SlackBot(
-                bot_token=slack_bot_token,
-                app_token=slack_app_token,
-                task_queue=self.task_queue,
-                scheduler=self.scheduler,
-                monitor=self.monitor,
-                report_generator=self.report_generator,
-                live_status_tracker=self.live_status_tracker,
-                workspace_root=str(self.config.agent.workspace_root),
-            )
-        else:
-            self.bot = None
-            logger.warning(
-                "daemon.headless_mode.enabled",
-                reason="no_slack_config",
-                hint="Slack tokens not configured. Running without notifications. Use 'sle check' to monitor status.",
-            )
+        # Initialize messaging bot: Telegram > Slack > Headless
+        self.bot = self._init_messaging_bot()
 
         self.timeout_manager = TaskTimeoutManager(
             config=self.config,
@@ -219,6 +200,73 @@ class SleeplessAgent:
             "Created seed task for workspace bootstrap (context engineering on multi-agent systems)"
         )
 
+    def _init_messaging_bot(self):
+        """Initialize messaging bot: Telegram > Slack > Headless.
+
+        Priority:
+        1. Telegram (if TELEGRAM_BOT_TOKEN is set)
+        2. Slack (if slack.bot_token and slack.app_token are set)
+        3. Headless mode (no notifications)
+
+        Returns:
+            TelegramBot, SlackBot, or None for headless mode
+        """
+        import os
+
+        # Check for Telegram first
+        telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+        if telegram_token and TELEGRAM_AVAILABLE:
+            try:
+                # Parse allowed chat IDs if configured
+                allowed_ids_str = os.environ.get("TELEGRAM_ALLOWED_CHAT_IDS", "")
+                allowed_chat_ids = None
+                if allowed_ids_str:
+                    allowed_chat_ids = {
+                        int(x.strip()) for x in allowed_ids_str.split(",") if x.strip()
+                    }
+
+                bot = TelegramBot(
+                    bot_token=telegram_token,
+                    task_queue=self.task_queue,
+                    scheduler=self.scheduler,
+                    monitor=self.monitor,
+                    report_generator=self.report_generator,
+                    live_status_tracker=self.live_status_tracker,
+                    workspace_root=str(self.config.agent.workspace_root),
+                    allowed_chat_ids=allowed_chat_ids,
+                )
+                logger.info("daemon.telegram_bot.initialized")
+                return bot
+            except Exception as e:
+                logger.error("daemon.telegram_bot.init_failed", error=str(e))
+                # Fall through to try Slack
+
+        # Check for Slack
+        slack_bot_token = getattr(self.config.slack, 'bot_token', None) if hasattr(self.config, 'slack') else None
+        slack_app_token = getattr(self.config.slack, 'app_token', None) if hasattr(self.config, 'slack') else None
+
+        if slack_bot_token and slack_app_token:
+            bot = SlackBot(
+                bot_token=slack_bot_token,
+                app_token=slack_app_token,
+                task_queue=self.task_queue,
+                scheduler=self.scheduler,
+                monitor=self.monitor,
+                report_generator=self.report_generator,
+                live_status_tracker=self.live_status_tracker,
+                workspace_root=str(self.config.agent.workspace_root),
+            )
+            logger.info("daemon.slack_bot.initialized")
+            return bot
+
+        # Headless mode
+        logger.warning(
+            "daemon.headless_mode.enabled",
+            reason="no_bot_config",
+            hint="No Telegram/Slack tokens configured. Running without notifications. Use 'sle check' to monitor status.",
+        )
+        return None
+
     def _signal_handler(self, sig, _frame) -> None:
         logger.info(f"Received signal {sig}, shutting down...")
         self.running = False
@@ -235,10 +283,11 @@ class SleeplessAgent:
         if self.bot:
             try:
                 import threading
-                bot_thread = threading.Thread(target=self.bot.start, daemon=True, name="SlackBot")
+                bot_type = type(self.bot).__name__
+                bot_thread = threading.Thread(target=self.bot.start, daemon=True, name=bot_type)
                 bot_thread.start()
                 await asyncio.sleep(0.5)  # Give bot time to initialize
-                logger.info("Slack bot started in background thread")
+                logger.info("daemon.bot.started", bot_type=bot_type)
             except Exception as exc:
                 logger.warning(
                     "daemon.bot.start_failed",

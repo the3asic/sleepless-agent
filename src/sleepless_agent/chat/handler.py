@@ -15,6 +15,7 @@ from sleepless_agent.chat.session import (
 from sleepless_agent.chat.executor import ChatExecutor
 from sleepless_agent.tasks.utils import slugify_project
 from sleepless_agent.monitoring.logging import get_logger
+from sleepless_agent.interfaces.message_client import MessageClient
 
 logger = get_logger(__name__)
 
@@ -34,7 +35,7 @@ class ChatHandler:
         session_manager: ChatSessionManager,
         chat_executor: ChatExecutor,
         task_queue,  # TaskQueue for project lookup
-        slack_client,  # WebClient for sending messages
+        message_client: MessageClient,  # Platform-agnostic message client
     ):
         """Initialize chat handler.
 
@@ -42,12 +43,12 @@ class ChatHandler:
             session_manager: Manages active chat sessions
             chat_executor: Executes Claude queries
             task_queue: Task queue for project validation
-            slack_client: Slack WebClient for posting messages
+            message_client: Platform-agnostic message client (Slack, Telegram, etc.)
         """
         self.session_manager = session_manager
         self.chat_executor = chat_executor
         self.task_queue = task_queue
-        self.slack_client = slack_client
+        self.message_client = message_client
         self._processing_users: set = set()  # Track users currently being processed
 
     def handle_chat_command(
@@ -365,67 +366,55 @@ class ChatHandler:
             self._processing_users.discard(user_id)
 
     def _send_processing_indicator(self, channel: str, thread_ts: str) -> Optional[str]:
-        """Send a processing indicator message and return its timestamp."""
-        try:
-            response = self.slack_client.chat_postMessage(
-                channel=channel,
-                thread_ts=thread_ts,
-                text="🔄 Processing your message...",
-            )
-            return response.get("ts")
-        except Exception as e:
-            logger.debug(f"Could not send processing indicator: {e}")
-            return None
+        """Send a processing indicator message and return its ID."""
+        result = self.message_client.send_message(
+            channel=channel,
+            message="🔄 Processing your message...",
+            thread_id=thread_ts,
+        )
+        if result.success:
+            return result.message_id
+        logger.debug("chat_handler.processing_indicator.failed", error=result.error)
+        return None
 
-    def _delete_message(self, channel: str, message_ts: Optional[str]) -> None:
-        """Delete a message by timestamp."""
-        if not message_ts:
+    def _delete_message(self, channel: str, message_id: Optional[str]) -> None:
+        """Delete a message by ID."""
+        if not message_id:
             return
-        try:
-            self.slack_client.chat_delete(channel=channel, ts=message_ts)
-        except Exception as e:
-            logger.debug(f"Could not delete message: {e}")
+        self.message_client.delete_message(channel=channel, message_id=message_id)
 
     def _update_session_ended(
         self, channel: str, thread_ts: str, session: ChatSession
     ) -> None:
         """Update the welcome message and remove active indicator when session ends."""
-        try:
-            # Remove the active emoji
-            self.slack_client.reactions_remove(
-                channel=channel,
-                timestamp=thread_ts,
-                name="speech_balloon",
-            )
-        except Exception as e:
-            logger.debug(f"Could not remove reaction: {e}")
-
-        try:
-            # Add ended emoji
-            self.slack_client.reactions_add(
-                channel=channel,
-                timestamp=thread_ts,
-                name="white_check_mark",  # ✅ emoji
-            )
-        except Exception as e:
-            logger.debug(f"Could not add ended reaction: {e}")
+        # Remove the active reaction and add ended reaction
+        # Note: Not all platforms support reactions (e.g., Telegram doesn't)
+        self.message_client.remove_reaction(
+            channel=channel,
+            message_id=thread_ts,
+            reaction="speech_balloon",
+        )
+        self.message_client.add_reaction(
+            channel=channel,
+            message_id=thread_ts,
+            reaction="white_check_mark",  # ✅ emoji
+        )
 
     def _send_thread_message(
         self, channel: str, thread_ts: str, text: str, blocks: Optional[List] = None
     ) -> None:
-        """Send a message to a thread."""
-        try:
-            kwargs = {
-                "channel": channel,
-                "thread_ts": thread_ts,
-                "text": text,
-                "mrkdwn": True,
-            }
-            if blocks:
-                kwargs["blocks"] = blocks
-            self.slack_client.chat_postMessage(**kwargs)
-        except Exception as e:
-            logger.error(f"Failed to send thread message: {e}")
+        """Send a message to a thread.
+
+        Note: blocks parameter is kept for backward compatibility but FormattedMessage
+        is preferred for platform-agnostic formatting.
+        """
+        result = self.message_client.send_message(
+            channel=channel,
+            message=text,
+            thread_id=thread_ts,
+        )
+        if not result.success:
+            logger.error("chat_handler.send_thread_message.failed", error=result.error)
 
     def _format_response_blocks(self, text: str) -> List[Dict]:
         """Format Claude's response into Slack Block Kit blocks for better visuals."""
