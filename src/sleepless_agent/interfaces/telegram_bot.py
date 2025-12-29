@@ -658,7 +658,11 @@ class TelegramBot:
         return re.sub(f'([{re.escape(special_chars)}])', r'\\\1', text)
 
     def start(self):
-        """Start the bot (blocking)."""
+        """Start the bot (blocking).
+
+        Note: When running in a background thread (as in daemon.py),
+        we must disable signal handlers since they only work in the main thread.
+        """
         logger.info("telegram_bot.starting")
 
         # Initialize message client with the bot instance
@@ -673,7 +677,11 @@ class TelegramBot:
         )
 
         # Run the bot with polling
-        self.app.run_polling(allowed_updates=Update.ALL_TYPES)
+        # stop_signals=None disables signal handlers (required for background threads)
+        self.app.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            stop_signals=None,
+        )
 
     async def start_async(self):
         """Start the bot asynchronously."""

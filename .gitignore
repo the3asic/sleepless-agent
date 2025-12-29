@@ -226,4 +226,4 @@ workspace/
 tests/
 
 # Local development docs (not tracked)
-CLAUDE.md
+CLAUDE.md.DS_Store
