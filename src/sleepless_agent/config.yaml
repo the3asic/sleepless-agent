@@ -51,7 +51,9 @@ multi_agent_workflow:
     max_turns: 10
 
 auto_generation:
-  enabled: true
+  enabled: true  # Re-enabled with P2 fixes (cooldown + queue limit + dedup)
+  min_interval_seconds: 300  # Cooldown between generations (5 minutes)
+  max_queue_size: 10         # Max pending+in_progress tasks before pausing generation
   prompts:
     - name: refine_focused
       prompt: |-
@@ -82,13 +84,17 @@ auto_generation:
         - Add missing components to existing implementations
         - Expand documentation or analysis from previous tasks
 
-        IMPORTANT Format Requirements:
-        - To refine a specific task: Use [REFINE:#<task_id>] followed by description
-          Example: [REFINE:#2] Improve error handling and add edge case tests
-        - For general refinements: Use [REFINE] followed by description
-        - Your response MUST be 1-2 sentences max
+        CRITICAL - Deduplication Rules:
+        - Do NOT generate tasks similar to any task listed above
+        - Do NOT repeat keywords like "validation", "error handling", "import/export" if already present
+        - Each new task must address a DIFFERENT aspect not covered by existing tasks
+        - If all aspects are covered, respond with: [SKIP] No new task needed
 
-        Focus on completing or improving what already exists rather than starting new projects.
+        Format Requirements:
+        - To refine a specific task: [REFINE:#<task_id>] followed by description
+        - For general refinements: [REFINE] followed by description
+        - Response MUST be 1-2 sentences max
+        - Or respond [SKIP] if no unique task can be generated
       weight: 0.45
     - name: balanced
       prompt: |-
@@ -124,12 +130,18 @@ auto_generation:
         - Automation and productivity improvements
         - Analysis and evaluation reports
 
-        IMPORTANT Format Requirements:
-        - To refine a specific task: Use [REFINE:#<task_id>] followed by description
-          Example: [REFINE:#1] Add comprehensive testing suite with edge cases
-        - For general refinements: Use [REFINE] followed by description
-        - For new tasks: Use [NEW] followed by description
-        - Your response MUST be 1-2 sentences max
+        CRITICAL - Deduplication Rules:
+        - Do NOT generate tasks similar to any task listed above
+        - Do NOT repeat the same topic/keywords from existing tasks
+        - NEW tasks must be in a DIFFERENT category than existing work
+        - If no unique valuable task exists, respond with: [SKIP] No new task needed
+
+        Format Requirements:
+        - To refine a specific task: [REFINE:#<task_id>] followed by description
+        - For general refinements: [REFINE] followed by description
+        - For new tasks: [NEW] followed by description
+        - Response MUST be 1-2 sentences max
+        - Or respond [SKIP] if no unique task can be generated
       weight: 0.35
     - name: new_friendly
       prompt: |-
@@ -165,10 +177,16 @@ auto_generation:
 
         Can be NEW (fresh project) or REFINE (improve existing work) - choose what would be most valuable.
 
-        IMPORTANT Format Requirements:
-        - To refine a specific task: Use [REFINE:#<task_id>] followed by description
-          Example: [REFINE:#3] Expand analysis with performance benchmarks
-        - For general refinements: Use [REFINE] followed by description
-        - For new tasks: Use [NEW] followed by description
-        - Your response MUST be 1-2 sentences max
+        CRITICAL - Deduplication Rules:
+        - Do NOT generate tasks similar to any task listed above
+        - Choose a DIFFERENT area/category than existing tasks
+        - Be creative - don't repeat patterns you see in the task list
+        - If the queue already has diverse tasks, respond with: [SKIP] No new task needed
+
+        Format Requirements:
+        - To refine a specific task: [REFINE:#<task_id>] followed by description
+        - For general refinements: [REFINE] followed by description
+        - For new tasks: [NEW] followed by description
+        - Response MUST be 1-2 sentences max
+        - Or respond [SKIP] if no unique task can be generated
       weight: 0.20

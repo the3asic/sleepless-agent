@@ -83,6 +83,8 @@ class AutoTaskGenerator:
         logger.debug("autogen.attempting_generation")
         task = await self._generate_task()
         if task:
+            # Update cooldown timer on successful generation
+            self.last_generation_time = datetime.now(timezone.utc).replace(tzinfo=None)
             logger.info("autogen.task.created", task_id=task.id, preview=task.description[:80], source=self._last_generation_source)
             return True
 
@@ -90,10 +92,47 @@ class AutoTaskGenerator:
         return False
 
     def _should_generate(self) -> bool:
-        """Check if usage is below pause threshold (use time-based thresholds)"""
+        """Check if conditions allow task generation.
+
+        Checks (in order):
+        1. Cooldown - minimum interval since last generation
+        2. Queue capacity - max pending + in_progress tasks
+        3. Usage threshold - API usage below limit
+        """
         from sleepless_agent.utils.zhipu_env import get_usage_checker
         from sleepless_agent.scheduling.time_utils import is_nighttime
 
+        # 1. Check cooldown (minimum interval since last generation)
+        min_interval = getattr(self.config, 'min_interval_seconds', 300)
+        if self.last_generation_time:
+            elapsed = (datetime.now(timezone.utc).replace(tzinfo=None) - self.last_generation_time).total_seconds()
+            if elapsed < min_interval:
+                logger.debug(
+                    "autogen.cooldown.active",
+                    elapsed_seconds=int(elapsed),
+                    min_interval=min_interval,
+                    remaining=int(min_interval - elapsed),
+                )
+                return False
+
+        # 2. Check queue capacity
+        max_queue = getattr(self.config, 'max_queue_size', 10)
+        try:
+            active_count = self.session.query(Task).filter(
+                Task.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS])
+            ).count()
+            if active_count >= max_queue:
+                logger.debug(
+                    "autogen.queue.full",
+                    active_count=active_count,
+                    max_queue_size=max_queue,
+                )
+                return False
+        except Exception as e:
+            logger.error("autogen.queue_check.failed", error=str(e))
+            return False
+
+        # 3. Check usage threshold
         try:
             checker = get_usage_checker()
             threshold = self.threshold_night if is_nighttime(night_start_hour=self.night_start_hour, night_end_hour=self.night_end_hour) else self.threshold_day
@@ -267,24 +306,33 @@ class AutoTaskGenerator:
         return context
 
     def _format_available_tasks(self, tasks: list[Task]) -> str:
-        """Format list of tasks that can be refined
+        """Format list of tasks that can be refined.
+
+        Only shows task ID, status, and a brief category hint to avoid
+        the model copying exact patterns from existing task descriptions.
 
         Args:
             tasks: List of tasks to format
 
         Returns:
-            Formatted string listing tasks with IDs and status
+            Formatted string listing tasks with minimal info
         """
         if not tasks:
             return "(No tasks available)"
 
+        # Limit to 3 most recent tasks to reduce prompt bloat
+        recent_tasks = tasks[:3]
+
         lines = []
-        for task in tasks:
+        for task in recent_tasks:
             status = task.status.value.upper() if task.status else "UNKNOWN"
-            desc = task.description[:100]
-            if len(task.description) > 100:
-                desc += "..."
-            lines.append(f"- Task #{task.id} ({status}): {desc}")
+            # Extract only first 30 chars as a hint, not full description
+            hint = task.description[:30].split()[0:3]  # First 3 words only
+            hint_text = " ".join(hint) + "..." if hint else "task"
+            lines.append(f"- Task #{task.id} ({status}): {hint_text}")
+
+        if len(tasks) > 3:
+            lines.append(f"- ... and {len(tasks) - 3} more tasks")
 
         return "\n".join(lines)
 
@@ -304,6 +352,11 @@ class AutoTaskGenerator:
         task_desc = await self._generate_from_prompt(prompt_config, context)
 
         if not task_desc:
+            return None
+
+        # Check for [SKIP] response - model decided no unique task needed
+        if task_desc.strip().upper().startswith("[SKIP]"):
+            logger.info("autogen.skip.no_unique_task", response=task_desc[:100])
             return None
 
         # Parse REFINE target task ID if present
