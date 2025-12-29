@@ -2,9 +2,10 @@
 > **This is a personal fork** of [context-machine-lab/sleepless-agent](https://github.com/context-machine-lab/sleepless-agent).
 >
 > I'm adding features that don't exist in the original:
-> - 🔌 **Zhipu GLM Coding Plan** support (替代 Claude，支持国内/国际版自动检测)
-> - 🤖 **MCP 动态注入** (Vision、Search、Reader 能力补充)
+> - 🔌 **Zhipu GLM Coding Plan** support (替代 Claude，支持国内/国际版自动检测) ✅
+> - 🤖 **MCP 动态注入** (Vision、Search、Reader 能力补充) ✅
 > - 💬 **Telegram** interface (alternative to Slack) ✅
+> - 🔄 **智能任务生成** (cooldown + 去重 + 容量限制) ✅
 >
 > This is a hobby project. For the official version, please visit the [upstream repository](https://github.com/context-machine-lab/sleepless-agent).
 
@@ -36,6 +37,7 @@ ZHIPU_BASE_URL=https://open.bigmodel.cn/api/anthropic
 | **区域自动检测** | 从 `ZHIPU_BASE_URL` 自动推断所有端点 |
 | **MCP 动态注入** | 补充 Vision、网络搜索、网页读取能力 |
 | **向后兼容** | `USE_ZHIPU=false` 时使用原版 Claude |
+| **智能任务生成** | cooldown 机制 + 去重 + 队列容量限制 |
 
 ### 与原版差异
 
@@ -45,8 +47,7 @@ ZHIPU_BASE_URL=https://open.bigmodel.cn/api/anthropic
 | Vision | 内置 | 通过 MCP |
 | 网络搜索 | 内置 | 通过 MCP |
 | 阈值设置 | 20%/80% | 85%/95% |
-
-详细开发文档见 `CLAUDE.md`。
+| 任务生成 | 无适配 | cooldown + 去重 |
 
 ---
 
