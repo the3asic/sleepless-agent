@@ -99,21 +99,21 @@ def build_zhipu_mcp_servers(
                 }
             }
 
-    # Search MCP - Web search (SSE mode)
+    # Search MCP - Web search (HTTP mode for Claude Code)
     if include_search and getattr(getattr(servers_config, 'search', None), 'enabled', True):
         servers["web-search-prime"] = {
-            "type": "sse",
-            "url": f"{mcp_base}/web_search_prime/sse",
+            "type": "http",
+            "url": f"{mcp_base}/web_search_prime/mcp",
             "headers": {
                 "Authorization": f"Bearer {api_key}"
             }
         }
 
-    # Reader MCP - Web page reading (SSE mode)
+    # Reader MCP - Web page reading (HTTP mode for Claude Code)
     if include_reader and getattr(getattr(servers_config, 'reader', None), 'enabled', True):
         servers["web-reader"] = {
-            "type": "sse",
-            "url": f"{mcp_base}/web_reader/sse",
+            "type": "http",
+            "url": f"{mcp_base}/web_reader/mcp",
             "headers": {
                 "Authorization": f"Bearer {api_key}"
             }
